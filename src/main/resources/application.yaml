@@ -1,0 +1,17 @@
+server:
+  port: 10010
+
+xxt:
+  user:
+    # 用户登录URL
+    loginUrl: https://passport2.chaoxing.com/fanyalogin
+    # 账号密码的加密密钥
+    phoneSecret: u2oh6Vu^HWe4_AES
+    # 获取用户信息的URL
+    infoUrl: https://passport2.chaoxing.com/mooc/accountManage
+    # 埋点URL
+    loginPreUrl: https://mooc2-ans.chaoxing.com/mooc2-ans/visit/interaction
+    refer: https%3A%2F%2Fmooc2-ans.chaoxing.com%2Fmooc2-ans%2Fvisit%2Finteraction
+
+
+
