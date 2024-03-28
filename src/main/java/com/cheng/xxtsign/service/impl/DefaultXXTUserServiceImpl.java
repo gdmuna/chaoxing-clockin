@@ -8,6 +8,7 @@ import com.cheng.xxtsign.utils.HeadersUtils;
 import com.cheng.xxtsign.vo.CourseVo;
 import com.cheng.xxtsign.vo.UserLoginVo;
 import okhttp3.*;
+import org.jetbrains.annotations.NotNull;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
@@ -52,68 +53,20 @@ public class DefaultXXTUserServiceImpl implements XXTUserService {
         userLoginVo.setRefer(userDataRefer);
 
 
-
-        HeadersUtils.requestToXXT(loginUrl, "POST", customRequestHeader(), HeadersUtils.objectToMap(userLoginVo));
-
-        OkHttpClient client = new OkHttpClient();
-
-        client = client.newBuilder().build();
-//                .cookieJar(xxtCookieJar)
-
-
-        // 构建一个POST请求，添加数据
-//        RequestBody requestBody = RequestBody.create(JSONObject.toJSONString(userLoginVo), JSON);
-
-        RequestBody requestBody = new FormBody.Builder()
-                .add("fid", userLoginVo.getFid().toString())
-                .add("uname", userLoginVo.getUname())
-                .add("password", userLoginVo.getPassword())
-                .add("refer", userLoginVo.getRefer())
-                .add("t", userLoginVo.getT())
-                .add("forbidotherlogin", userLoginVo.getForbidotherlogin().toString())
-                .add("validate", "")
-                .add("doubleFactorLogin", userLoginVo.getDoubleFactorLogin().toString())
-                .add("independentId", userLoginVo.getIndependentId().toString())
-                .add("independentNameId", userLoginVo.getIndependentNameId().toString())
-                .build();
-
-        Request.Builder builder = new Request.Builder();
-
-        Map<String, String> stringStringMap = customRequestHeader();
-
-        for (Map.Entry<String, String> entry : stringStringMap.entrySet()) {
-            builder.addHeader(entry.getKey(), entry.getValue());
-        }
-
-        Request request = builder
-                .url(loginUrl)
-                .post(requestBody)
-                .build();
+        Response response = HeadersUtils.requestToXXT(loginUrl, "POST", customRequestHeader(),
+                HeadersUtils.objectToMap(userLoginVo));
 
 
         try {
-            Response response = client.newCall(request).execute();
             String responseBody = response.body().string();
-//            System.out.println("Response: " + responseBody);
-
+            System.out.println(phone + " 登录Response: " + responseBody);
             JSONObject jsonObject = JSONObject.parseObject(responseBody);
             if(jsonObject.getString("status").equals("true")) {
                 // 登录请求成功
                 List<String> headers = response.headers("set-Cookie");
-
                 // 空置判断
 
-                // 获取信息
-                JSONObject jsonObject1 = new JSONObject();
-                for (String header : headers) {
-                    // 找到第一个分号的位置
-                    int endIndex = header.indexOf(";");
-                    String result = header.substring(0, endIndex);
-                    System.out.println("裁剪后header是：" + result);
-                    String[] pairs = result.split("=");
-                    jsonObject1.put(pairs[0], pairs[1]);
-                }
-                System.out.println("装变成json的数据：" + jsonObject1.toString());
+                JSONObject jsonObject1 = HeadersUtils.getJsonObject(headers);
 
                 // 保存数据到本地
                 HeadersUtils.storeUser(phone, jsonObject1);
@@ -123,24 +76,16 @@ public class DefaultXXTUserServiceImpl implements XXTUserService {
             }
         } catch (IOException e) {
             e.printStackTrace();
+            return false;
         }
-
-
-
         return true;
     }
-
-
-
 
     /**
      * 设置请求头，返回登录请求头
      * @return
      */
     public Map<String, String> customRequestHeader() {
-//        HttpHeaders httpHeader = new HttpHeaders();
-
-
         Map<String, String> headers = HeadersUtils.getHeaders();
         Map<String, String> copyMap = new HashMap<>();
         copyMap.putAll(headers);
@@ -154,11 +99,6 @@ public class DefaultXXTUserServiceImpl implements XXTUserService {
         copyMap.put("Sec-Fetch-Site", "same-origin");
         copyMap.put("X-Requested-With", "XMLHttpRequest");
 
-        // 设置请求头
-//        for (Map.Entry<String, String> entry : copyMap.entrySet()) {
-//            httpHeader.set(entry.getKey(), entry.getValue());
-//        }
-
         return copyMap;
     }
 
@@ -168,90 +108,32 @@ public class DefaultXXTUserServiceImpl implements XXTUserService {
      */
 
     public List<CourseVo> getCourses(String uid, String d, String v3){
-        OkHttpClient client = new OkHttpClient();
+        String url = "https://mooc1-1.chaoxing.com/visit/courselistdata";
 
-        client = client.newBuilder().build();
+        // 请求头
+        Map<String, String> headerMap = new HashMap<>();
+        headerMap.put("Accept", "text/html, */*; q=0.01");
+        headerMap.put("Accept-Encoding", "gzip, deflate");
+        headerMap.put("Accept-Language", "zh-CN,zh;q=0.9,en;q=0.8,en-GB;q=0.7,en-US;q=0.6");
+        headerMap.put("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8");
+        headerMap.put("Cookie", "_uid=" + uid + "; _d=" + d + "; vc3=" + v3);
 
-        RequestBody requestBody = new FormBody.Builder()
-                .add("courseType", "1")
-                .add("courseFolderId", "0")
-                .add("courseFolderSize", "0")
-                .build();
+        // 请求体
+        Map<String, String> paramMap = new HashMap<>();
+        paramMap.put("courseType", "1");
+        paramMap.put("courseFolderId", "0");
+        paramMap.put("courseFolderSize", "0");
 
-        Request.Builder builder = new Request.Builder();
-
-//        Map<String, String> stringStringMap = HeadersUtils.getHeaders();
-//
-//        Map<String, String> copyMap = new HashMap<>();
-////        copyMap.putAll(stringStringMap);
-//
-//        copyMap.put("Accept", "text/html, */*; q=0.01");
-//        copyMap.put("Accept-Encoding", "gzip, deflate");
-//        copyMap.put("Accept-Language", "zh-CN,zh;q=0.9,en;q=0.8,en-GB;q=0.7,en-US;q=0.6");
-//        copyMap.put("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8;");
-//        copyMap.put("Cookie", "_uid="+uid + "; _d=" + d + "; vc3=" + v3);
-//
-//        for (Map.Entry<String, String> entry : copyMap.entrySet()) {
-//            builder.addHeader(entry.getKey(), entry.getValue());
-//        }
-
-        builder.addHeader("Accept", "text/html, */*; q=0.01")
-                .addHeader("Accept-Encoding", "gzip, deflate")
-                .addHeader("Accept-Language", "zh-CN,zh;q=0.9,en;q=0.8,en-GB;q=0.7,en-US;q=0.6")
-                .addHeader("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8")
-                .addHeader("Cookie", "_uid=" + uid + "; _d=" + d + "; vc3=" + v3);
-
-
-        Request request = builder
-                .url("https://mooc1-1.chaoxing.com/visit/courselistdata")
-                .post(requestBody)
-                .build();
+        Response response = HeadersUtils.requestToXXT(url, "POST", headerMap, paramMap);
 
         try {
-            Response response = client.newCall(request).execute();
             ResponseBody responseBody = response.body();
             String responseData = null;
             if (responseBody != null) {
-                responseData = decompress(responseBody.bytes());
-//                System.out.println("Decompressed Response Data: " + responseData);
+                responseData = HeadersUtils.decompress(responseBody.bytes());
             }
 
-            // 从 HTML 页面内容，解析出所有 courseId 和 classId，填充到数组返回
-
-//            int endOfCourseId;
-//            int i = 1;
-//            while (true) {
-//                i = responseData.indexOf("course_", i);
-//                if (i == -1) break;
-//                endOfCourseId = responseData.indexOf("_", i + 7);
-////                arr.add(new CourseType(
-////                        data.substring(i + 7, endOfCourseId),
-////                        data.substring(endOfCourseId + 1, data.indexOf("\"", i + 1))
-////                ));
-//                System.out.println("courseId" + responseData.substring(i + 7, endOfCourseId));
-//                System.out.println("clazzId" + responseData.substring(endOfCourseId + 1, responseData.indexOf("\"", i + 1)));
-//            }
-
-            // 定义正则表达式
-            String regex = "course_(\\d+)_(\\d+)";
-
-            // 编译正则表达式
-            Pattern pattern = Pattern.compile(regex);
-            Matcher matcher = pattern.matcher(responseData);
-
-            List<CourseVo> arrayList = new ArrayList<>();
-            // 查找匹配项
-            while (matcher.find()) {
-//                String courseId = matcher.group(1);
-//                String clazzId = matcher.group(2);
-                CourseVo courseVo = new CourseVo();
-                courseVo.setCourseId(matcher.group(1));
-                courseVo.setClazzId(matcher.group(2));
-                arrayList.add(courseVo);
-//                System.out.println("courseId: " + courseId);
-//                System.out.println("clazzId: " + clazzId);
-            }
-            return arrayList;
+            return HeadersUtils.getCourseVos(responseData);
 
         } catch (IOException e) {
             e.printStackTrace();
@@ -261,28 +143,20 @@ public class DefaultXXTUserServiceImpl implements XXTUserService {
     }
 
     /**
-     * 解码网络gzip包
-     * @param compressed
+     * 查询需要签到的课
+     * @param courseVoList
+     * @param cookie
      * @return
-     * @throws IOException
      */
-    private static String decompress(byte[] compressed) throws IOException {
-        GZIPInputStream gzipInputStream = new GZIPInputStream(new ByteArrayInputStream(compressed));
-        BufferedReader reader = new BufferedReader(new InputStreamReader(gzipInputStream, StandardCharsets.UTF_8));
-        StringBuilder stringBuilder = new StringBuilder();
-        String line;
-        while ((line = reader.readLine()) != null) {
-            stringBuilder.append(line);
-        }
-        return stringBuilder.toString();
-    }
-
     private JSONObject traverseCourseActivity(List<CourseVo> courseVoList, JSONObject cookie) {
         System.out.println("================正在查询是否有签到====================");
         // 只查3个
         int signNum = 0;
         // todo: 多线程处理, 目前只查一个签到
         for (CourseVo courseVo : courseVoList) {
+            if (signNum >= 3) {
+                break;
+            }
             JSONObject activity = getActivity(courseVo, cookie);
             if (activity != null) {
                 signNum++;
@@ -292,6 +166,12 @@ public class DefaultXXTUserServiceImpl implements XXTUserService {
         return null;
     }
 
+    /**
+     * 查询签到
+     * @param courseVo
+     * @param cookie
+     * @return
+     */
     private JSONObject getActivity(CourseVo courseVo, JSONObject cookie) {
         // get
         String url = "https://mobilelearn.chaoxing.com/v2/apis/active/student/activelist?fid=0&courseId="
@@ -611,7 +491,7 @@ public class DefaultXXTUserServiceImpl implements XXTUserService {
     }
 
     public static void main(String[] args) {
-        JSONObject user = HeadersUtils.getUser("13018436372");
+        JSONObject user = HeadersUtils.getUser("18676069475");
         DefaultXXTUserServiceImpl defaultXXTUserService = new DefaultXXTUserServiceImpl();
         List<CourseVo> courses = defaultXXTUserService.getCourses(user.getString("_uid"), user.getString("_d"), user.getString("vc3"));
 
