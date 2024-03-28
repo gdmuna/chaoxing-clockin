@@ -26,7 +26,11 @@ public class XXTUserController {
      * @return
      */
     @GetMapping("/join")
-    public CommonResult joinGroup(@RequestParam("mark") String mark) {
-        return CommonResult.success("加入成功");
+    public CommonResult joinGroup(@RequestParam("mark") String mark, @RequestParam("phone") String phone) {
+        boolean join = xxtUserService.join(mark, phone);
+        if (join) {
+            return CommonResult.success("加入成功");
+        }
+        return CommonResult.success("请检查组标识或者手机号码正确性，请确保此号码已经在本系统登录");
     }
 }

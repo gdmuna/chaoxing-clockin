@@ -11,4 +11,5 @@ public interface XXTUserService {
     boolean userLogin(String phone, String password);
 
 
+    boolean join(String mark, String phone);
 }
