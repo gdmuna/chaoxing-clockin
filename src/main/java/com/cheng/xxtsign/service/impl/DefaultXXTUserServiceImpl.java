@@ -3,12 +3,14 @@ package com.cheng.xxtsign.service.impl;
 import cn.hutool.core.util.ObjectUtil;
 import com.alibaba.fastjson2.JSONObject;
 import com.cheng.xxtsign.dao.cookie.XXTCookieJar;
+import com.cheng.xxtsign.enums.LocationSignEnum;
 import com.cheng.xxtsign.service.XXTUserService;
 import com.cheng.xxtsign.utils.HeadersUtils;
 import com.cheng.xxtsign.vo.CourseVo;
 import com.cheng.xxtsign.vo.UserLoginVo;
 import okhttp3.*;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
@@ -70,6 +72,10 @@ public class DefaultXXTUserServiceImpl implements XXTUserService {
 
                 // 保存数据到本地
                 HeadersUtils.storeUser(phone, jsonObject1);
+
+                String userInfo = getUserInfo(jsonObject1);
+                // 保存用户名
+                HeadersUtils.storeUserName(userInfo, phone);
             }else {
                 // 登录失败
                 return false;
@@ -124,9 +130,10 @@ public class DefaultXXTUserServiceImpl implements XXTUserService {
         paramMap.put("courseFolderId", "0");
         paramMap.put("courseFolderSize", "0");
 
-        Response response = HeadersUtils.requestToXXT(url, "POST", headerMap, paramMap);
+
 
         try {
+            Response response = HeadersUtils.requestToXXT(url, "POST", headerMap, paramMap);
             ResponseBody responseBody = response.body();
             String responseData = null;
             if (responseBody != null) {
@@ -148,11 +155,13 @@ public class DefaultXXTUserServiceImpl implements XXTUserService {
      * @param cookie
      * @return
      */
-    private JSONObject traverseCourseActivity(List<CourseVo> courseVoList, JSONObject cookie) {
+    public List<JSONObject> traverseCourseActivity(List<CourseVo> courseVoList, JSONObject cookie) {
         System.out.println("================正在查询是否有签到====================");
+
+        List<JSONObject> courses = new ArrayList<>();
         // 只查3个
         int signNum = 0;
-        // todo: 多线程处理, 目前只查一个签到
+        // todo: 多线程处理，太多课程了，得加延时或者只查前面的
         for (CourseVo courseVo : courseVoList) {
             if (signNum >= 3) {
                 break;
@@ -160,10 +169,12 @@ public class DefaultXXTUserServiceImpl implements XXTUserService {
             JSONObject activity = getActivity(courseVo, cookie);
             if (activity != null) {
                 signNum++;
-                return activity;
+                courses.add(activity);
             }
         }
-        return null;
+
+        System.out.println("========================================");
+        return courses;
     }
 
     /**
@@ -175,76 +186,71 @@ public class DefaultXXTUserServiceImpl implements XXTUserService {
     private JSONObject getActivity(CourseVo courseVo, JSONObject cookie) {
         // get
         String url = "https://mobilelearn.chaoxing.com/v2/apis/active/student/activelist?fid=0&courseId="
-                + courseVo.getCourseId() + "&classId=" + courseVo.getClazzId() + "&showNotStartedActive=0" + "&_=" + System.currentTimeMillis();
+                + courseVo.getCourseId() + "&classId=" + courseVo.getClazzId() + "&showNotStartedActive=0"
+                + "&_=" + System.currentTimeMillis();
 
-        System.out.println("请求的url：" + url);
+        // 请求头
+        HashMap<String, String> headerMap = new HashMap<>();
+        headerMap.put("Accept", "*/*");
+        headerMap.put("Referer", "https://mooc2-ans.chaoxing.com/");
+        headerMap.put("Sec-Fetch-Dest", "empty");
+        headerMap.put("Sec-Fetch-Mode", "cors");
+        headerMap.put("Sec-Fetch-Site", "same-origin");
+        headerMap.put("X-Requested-With", "XMLHttpRequest");
+        headerMap.put("Cookie", HeadersUtils.jsonToHeader(cookie));
 
-
-        OkHttpClient client = new OkHttpClient();
-
-        client = client.newBuilder().build();
-
-
-        Request.Builder builder = new Request.Builder();
-
-
-        builder.addHeader("Accept", "*/*")
-                .addHeader("Referer", "https://mooc2-ans.chaoxing.com/")
-                .addHeader("Sec-Fetch-Dest", "empty")
-                .addHeader("Sec-Fetch-Mode", "cors")
-                .addHeader("Sec-Fetch-Site", "same-origin")
-                .addHeader("X-Requested-With", "XMLHttpRequest")
-                .addHeader("Cookie", HeadersUtils.jsonToHeader(cookie));
-
-
-        Request request = builder
-                .url(url)
-                .get()
-                .build();
+        Response response = HeadersUtils.requestToXXT(url, "GET", headerMap);
 
         try {
-            Response response = client.newCall(request).execute();
-//            String string = response.body().string();
-//
 //            System.out.println("查询结果" + string);
-            String string = response.body().string();
-            JSONObject jsonData = JSONObject.parseObject(string);
+            String responseString = response.body().string();
 
-            JSONObject data = jsonData.getJSONObject("data");
-
-            if (data.getJSONArray("activeList").size() != 0) {
-                JSONObject activeList = data.getJSONArray("activeList").getJSONObject(0);
-                String otherId = activeList.getString("otherId");
-
-                if (isNumeric(otherId) && Integer.parseInt(otherId) >= 0 && Integer.parseInt(otherId) <= 5 && activeList.getIntValue("status") == 1) {
-                    long currentTime = new Date().getTime();
-                    long startTime = activeList.getLongValue("startTime");
-
-                    if ((currentTime - startTime) / 1000 < 7200) {
-                        // todo: 超过5个不签到
-                        System.out.println("检测到活动：" + activeList.getString("nameOne"));
-
-                        // todo: 抽取为对象
-                        JSONObject result = new JSONObject();
-                        result.put("activeId", activeList.getLongValue("id"));
-                        result.put("name", activeList.getString("nameOne"));
-                        result.put("courseId", courseVo.getCourseId());
-                        result.put("classId", courseVo.getClazzId());
-                        result.put("otherId", otherId);
-
-                        System.out.println(result.toJSONString());
-
-                        return result;
-                    }
-                }
-            }
+            return getCourseOtherActivity(courseVo, responseString);
 
 
-            System.out.println("========================================");
+
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
+    }
 
+    /**
+     * 检查到活动
+     * @param courseVo
+     * @param responseString
+     * @return
+     */
+    @Nullable
+    private static JSONObject getCourseOtherActivity(CourseVo courseVo, String responseString) {
+        JSONObject jsonData = JSONObject.parseObject(responseString);
+        JSONObject data = jsonData.getJSONObject("data");
+
+        if (data.getJSONArray("activeList").size() != 0) {
+            JSONObject activeList = data.getJSONArray("activeList").getJSONObject(0);
+            String otherId = activeList.getString("otherId");
+
+            if (isNumeric(otherId) && Integer.parseInt(otherId) >= 0 && Integer.parseInt(otherId) <= 5 && activeList.getIntValue("status") == 1) {
+                long currentTime = new Date().getTime();
+                long startTime = activeList.getLongValue("startTime");
+
+                if ((currentTime - startTime) / 1000 < 7200) {
+                    // todo: 超过5个不签到
+                    System.out.println("检测到活动：" + activeList.getString("nameOne"));
+
+                    // todo: 抽取为对象
+                    JSONObject result = new JSONObject();
+                    result.put("activeId", activeList.getLongValue("id"));
+                    result.put("name", activeList.getString("nameOne"));
+                    result.put("courseId", courseVo.getCourseId());
+                    result.put("classId", courseVo.getClazzId());
+                    result.put("otherId", otherId);
+
+                    System.out.println(result.toJSONString());
+
+                    return result;
+                }
+            }
+        }
         return null;
     }
 
@@ -260,6 +266,7 @@ public class DefaultXXTUserServiceImpl implements XXTUserService {
         }
     }
 
+
     /**
      * 获取用户的名字
      * @param cookie
@@ -268,27 +275,22 @@ public class DefaultXXTUserServiceImpl implements XXTUserService {
     public String getUserInfo(JSONObject cookie) {
         // get
         String url = "https://passport2.chaoxing.com/mooc/accountManage";
+        HashMap<String, String> headerMap = new HashMap<>();
+        headerMap.put("Cookie", HeadersUtils.jsonToHeader(cookie));
 
-
-        OkHttpClient client = new OkHttpClient();
-        client = client.newBuilder().build();
-        Request.Builder builder = new Request.Builder();
-        builder.addHeader("Cookie", HeadersUtils.jsonToHeader(cookie));
-
-        Request request = builder
-                .url(url)
-                .get()
-                .build();
+        Response response = HeadersUtils.requestToXXT(url, "GET", headerMap);
 
 
         try {
-            Response response = client.newCall(request).execute();
             String data = response.body().string();
 
+            // 获取用户名字
             int endOfMessageName = data.indexOf("messageName") + 20;
             String name = data.substring(endOfMessageName, data.indexOf("\"", endOfMessageName));
 
-            System.out.println("用户个人信息：" + name);
+            System.out.println("===================================");
+            System.out.println("用户名字：" + name);
+            System.out.println("===================================");
 
             return name;
         } catch (IOException e) {
@@ -308,55 +310,43 @@ public class DefaultXXTUserServiceImpl implements XXTUserService {
         String url = "https://mobilelearn.chaoxing.com/newsign/preSign?courseId=" + activity.getString("classId") +
                 "&activePrimaryId=" + activity.getString("activeId") + "&general=1&sys=1&ls=1&appType=15&&tid=&uid=" +
                 cookie.getString("_uid") + "&ut=s";
+        HashMap<String, String> headerMap = new HashMap<>();
+        headerMap.put("Cookie", HeadersUtils.jsonToHeader(cookie));
 
-        OkHttpClient client = new OkHttpClient();
-        client = client.newBuilder().build();
-        Request.Builder builder = new Request.Builder();
-        builder.addHeader("Cookie", HeadersUtils.jsonToHeader(cookie));
+        // 第一次预先请求
+        HeadersUtils.requestToXXT(url, "GET", headerMap);
+        System.out.println("预先请求完成1");
 
-        Request request = builder
-                .url(url)
-                .get()
-                .build();
-
-        try {
-            Response response = client.newCall(request).execute();
-
-            analysisResult(activity, cookie);
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
+        // 第二次
+        analysisResult(activity, cookie);
     }
 
     public void analysisResult(JSONObject activity, JSONObject cookie) {
         //get
         String url = "https://mobilelearn.chaoxing.com/pptSign/analysis?vs=1&DB_STRATEGY=RANDOM&aid=" + activity.getString("activeId");
 
-        OkHttpClient client = new OkHttpClient();
-        client = client.newBuilder().build();
-        Request.Builder builder = new Request.Builder();
-        builder.addHeader("Cookie", HeadersUtils.jsonToHeader(cookie));
+        HashMap<String, String> headerMap = new HashMap<>();
+        headerMap.put("Cookie", HeadersUtils.jsonToHeader(cookie));
 
-        Request request = builder
-                .url(url)
-                .get()
-                .build();
+        // 第二次预先请求
+        Response response = HeadersUtils.requestToXXT(url, "GET", headerMap);
+        System.out.println("预先请求完成2");
 
         try {
-            Response response = client.newCall(request).execute();
             String code = response.body().string();
-
 //            JSONObject jsonData = JSONObject.parseObject(string);
 //
 //            JSONObject data = jsonData.getJSONObject("data");
 //            String code = data.toString();
 
+            // 正则出要的码
             int codeStart = code.indexOf("code=\\'+\\'") + 8;
             String codeSubstring = code.substring(codeStart);
 
             int codeEnd = codeSubstring.indexOf("'");
             code = codeSubstring.substring(0, codeEnd);
 
+            // 再次请求
             analysis2Result(code, cookie);
 
         } catch (IOException e) {
@@ -368,90 +358,132 @@ public class DefaultXXTUserServiceImpl implements XXTUserService {
         //get
         String url = "https://mobilelearn.chaoxing.com/pptSign/analysis2?DB_STRATEGY=RANDOM&code=" + code;
 
-        OkHttpClient client = new OkHttpClient();
-        client = client.newBuilder().build();
-        Request.Builder builder = new Request.Builder();
-        builder.addHeader("Cookie", HeadersUtils.jsonToHeader(cookie));
+        HashMap<String, String> headerMap = new HashMap<>();
+        headerMap.put("Cookie", HeadersUtils.jsonToHeader(cookie));
 
-        Request request = builder
-                .url(url)
-                .get()
-                .build();
+        // 第二次预先请求
+        Response response = HeadersUtils.requestToXXT(url, "GET", headerMap);
+        System.out.println("预先请求完成3");
 
         try {
-            Response response = client.newCall(request).execute();
             String string = response.body().string();
-            System.out.println("请求结果：" + string);
+            System.out.println("预先请求结果：" + string);
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
 
         // Sleep for 500ms
         try {
+            System.out.println("睡眠0.5秒");
             TimeUnit.MILLISECONDS.sleep(500);
         } catch (InterruptedException e) {
             e.printStackTrace();
         }
     }
 
-    public void generalSign(JSONObject cookie, String activeId, String name) {
+    // 普通签到
+    public boolean generalSign(JSONObject cookie, String activeId, String name) {
         // get
         String url = "https://mobilelearn.chaoxing.com/pptSign/stuSignajax?activeId=" + activeId + "&uid=" + cookie.getString("_uid") +
                 "&clientip=&latitude=-1&longitude=-1&appType=15&fid=" + cookie.getString("fid") + "&name=" + name;
 
-        OkHttpClient client = new OkHttpClient();
-        client = client.newBuilder().build();
-        Request.Builder builder = new Request.Builder();
-        builder.addHeader("Cookie", HeadersUtils.jsonToHeader(cookie));
+        HashMap<String, String> headerMap = new HashMap<>();
+        headerMap.put("Cookie", HeadersUtils.jsonToHeader(cookie));
 
-        Request request = builder
-                .url(url)
-                .get()
-                .build();
+        Response response = HeadersUtils.requestToXXT(url, "GET", headerMap);
+
 
         try {
-            Response response = client.newCall(request).execute();
             String string = response.body().string();
             System.out.println("签到结果：" + string);
+            if (string.equals("success")) {
+                return true;
+            }
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
+
+        return false;
     }
 
-    private void locationSign(JSONObject cookie, String activeId, String name) {
+    public boolean locationSign(JSONObject cookie, String activeId, String name) {
 
-        String longitude = randomValue(113.868804, 113.868810);
-        String latitude = randomValue(22.930029, 22.930031);
+//        String longitude = randomValue(113.868804, 113.868810);
+//        String latitude = randomValue(22.930029, 22.930031);
+        return locationSign(cookie, activeId, name, null);
+
+    }
+
+    public boolean locationSign(JSONObject cookie, String activeId, String name, String location) {
+        // 默认在A栋
+        String longitude = randomCenterValue(LocationSignEnum.GDMU_A.getLongitude());
+        String latitude = randomCenterValue(LocationSignEnum.GDMU_A.getLatitude());
+
+        // 位置确定
+        if (location != null) {
+            if (location.equals("GDMUB")) {
+                longitude = randomCenterValue(LocationSignEnum.GDMU_B.getLongitude());
+                latitude = randomCenterValue(LocationSignEnum.GDMU_B.getLatitude());
+            } else if (location.equals("GDMUC")) {
+                longitude = randomCenterValue(LocationSignEnum.GDMU_C.getLongitude());
+                latitude = randomCenterValue(LocationSignEnum.GDMU_C.getLatitude());
+            } else if (location.equals("GDMUD")) {
+                longitude = randomCenterValue(LocationSignEnum.GDMU_D.getLongitude());
+                latitude = randomCenterValue(LocationSignEnum.GDMU_D.getLatitude());
+            } else if (location.equals("GDMUE")) {
+                longitude = randomCenterValue(LocationSignEnum.GDMU_E.getLongitude());
+                latitude = randomCenterValue(LocationSignEnum.GDMU_E.getLatitude());
+            } else if (location.equals("GDMUF")) {
+                longitude = randomCenterValue(LocationSignEnum.GDMU_F.getLongitude());
+                latitude = randomCenterValue(LocationSignEnum.GDMU_F.getLatitude());
+            } else if (location.equals("GDMUG")) {
+                longitude = randomCenterValue(LocationSignEnum.GDMU_G.getLongitude());
+                latitude = randomCenterValue(LocationSignEnum.GDMU_G.getLatitude());
+            } else if (location.equals("GDMUH")) {
+                longitude = randomCenterValue(LocationSignEnum.GDMU_H.getLongitude());
+                latitude = randomCenterValue(LocationSignEnum.GDMU_H.getLatitude());
+            } else if (location.equals("S")) {
+                longitude = randomCenterValue(LocationSignEnum.GDMU_S.getLongitude());
+                latitude = randomCenterValue(LocationSignEnum.GDMU_S.getLatitude());
+            }
+        }
 
         String url = "https://mobilelearn.chaoxing.com/pptSign/stuSignajax?name=" + name + "&address=中国广东省东莞市大岭山镇科苑路"
                 + "&activeId=" + activeId + "&uid=" + cookie.getString("_uid") + "&clientip=&latitude=" + latitude +
                 "&longitude=" + longitude + "&fid=" + cookie.getString("fid") + "&appType=15&ifTiJiao=1&validate=";
 
+        HashMap<String, String> headerMap = new HashMap<>();
+        headerMap.put("Cookie", HeadersUtils.jsonToHeader(cookie));
+        Response response = HeadersUtils.requestToXXT(url, "GET", headerMap);
 
-        OkHttpClient client = new OkHttpClient();
-        client = client.newBuilder().build();
-        Request.Builder builder = new Request.Builder();
-        builder.addHeader("Cookie", HeadersUtils.jsonToHeader(cookie));
-
-        Request request = builder
-                .url(url)
-                .get()
-                .build();
-
-        Response response = null;
         try {
-            response = client.newCall(request).execute();
             String string = response.body().string();
             System.out.println("签到结果：" + string);
+            if (string.equals("success")) {
+                return true;
+            }
+            return false;
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
-
     }
 
     public static String randomValue(double min, double max) {
         Random random = new Random();
         double randomValue = min + (max - min) * random.nextDouble();
+
+        // 控制小数点后的位数为6位
+        DecimalFormat df = new DecimalFormat("#.######");
+        String randomString = df.format(randomValue);
+
+        System.out.println("随机：" + randomString);
+
+        return randomString;
+    }
+
+    public static String randomCenterValue(double num) {
+        Random random = new Random();
+        double randomValue = (num - 0.000250) + (0.000500) * random.nextDouble();
 
         // 控制小数点后的位数为6位
         DecimalFormat df = new DecimalFormat("#.######");
@@ -491,28 +523,31 @@ public class DefaultXXTUserServiceImpl implements XXTUserService {
     }
 
     public static void main(String[] args) {
-        JSONObject user = HeadersUtils.getUser("18676069475");
+        JSONObject user = HeadersUtils.getUser("15992601106");
         DefaultXXTUserServiceImpl defaultXXTUserService = new DefaultXXTUserServiceImpl();
         List<CourseVo> courses = defaultXXTUserService.getCourses(user.getString("_uid"), user.getString("_d"), user.getString("vc3"));
 
-        JSONObject jsonObject = defaultXXTUserService.traverseCourseActivity(courses, user);
+        for (JSONObject jsonObject : defaultXXTUserService.traverseCourseActivity(courses, user)) {
+            if (ObjectUtil.isEmpty(jsonObject)) {
+                return;
+            }
+            String userInfo = defaultXXTUserService.getUserInfo(user);
 
-        if (ObjectUtil.isEmpty(jsonObject)) {
-            return;
+
+            defaultXXTUserService.preSign(jsonObject, user);
+
+            // 普通签到
+            if (jsonObject.getString("otherId").equals("0")) {
+                defaultXXTUserService.generalSign(user, jsonObject.getString("activeId"), userInfo);
+            } else if (jsonObject.getString("otherId").equals("3")) {
+                defaultXXTUserService.generalSign(user, jsonObject.getString("activeId"), userInfo);
+            } else if (jsonObject.getString("otherId").equals("4")) {
+                defaultXXTUserService.locationSign(user, jsonObject.getString("activeId"), userInfo);
+            }
         }
-        String userInfo = defaultXXTUserService.getUserInfo(user);
 
 
-        defaultXXTUserService.preSign(jsonObject, user);
-
-        // 普通签到
-        if (jsonObject.getString("otherId").equals("0")) {
-            defaultXXTUserService.generalSign(user, jsonObject.getString("activeId"), userInfo);
-        } else if (jsonObject.getString("otherId").equals("3")) {
-            defaultXXTUserService.generalSign(user, jsonObject.getString("activeId"), userInfo);
-        } else if (jsonObject.getString("otherId").equals("4")) {
-            defaultXXTUserService.locationSign(user, jsonObject.getString("activeId"), userInfo);
-        }
+        
 
 
 //        DefaultXXTUserServiceImpl.randomValue(113.868562, 113.869482);

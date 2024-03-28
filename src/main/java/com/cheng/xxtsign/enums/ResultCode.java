@@ -1,4 +1,4 @@
-package com.cheng.xxtsign.eunm;
+package com.cheng.xxtsign.enums;
 
 /**
  * @author xiaoc
