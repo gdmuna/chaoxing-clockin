@@ -15,9 +15,11 @@ public class XXTUserController {
      */
     @GetMapping("/login")
     public CommonResult userLogin(@RequestParam("phone") String phone, @RequestParam("password") String password) {
-        xxtUserService.userLogin(phone, password);
+        if (xxtUserService.userLogin(phone, password)) {
+            return CommonResult.success("登录成功");
+        }
 
-        return CommonResult.success("登录成功");
+        return CommonResult.success("登录失败");
     }
 
     /**
