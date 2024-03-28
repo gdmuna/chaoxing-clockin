@@ -1,6 +1,6 @@
 package com.cheng.xxtsign.common;
 
-import com.cheng.xxtsign.eunm.ResultCode;
+import com.cheng.xxtsign.enums.ResultCode;
 
 public class CommonResult<T> {
 

@@ -7,6 +7,7 @@ import com.alibaba.fastjson2.JSONObject;
 import com.cheng.xxtsign.vo.CourseVo;
 import okhttp3.*;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.util.StringUtils;
 
 import javax.crypto.Cipher;
@@ -118,6 +119,48 @@ public class HeadersUtils {
         }
     }
 
+    public static boolean storeUserName(String name, String phone) {
+        // 获取原先数据
+        String filePath = "user.json"; // 指定的文件目录
+
+        JSONArray jsonArray;
+
+        try {
+            String content = new String(Files.readAllBytes(Paths.get(filePath)));
+            if (StringUtils.isEmpty(content)) {
+                jsonArray = new JSONArray();
+            }else {
+                jsonArray = JSONArray.parseArray(content);
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+            return false;
+        }
+
+
+        if (!ObjectUtil.isEmpty(jsonArray)) {
+            for (int i = 0; i < jsonArray.size(); i++) {
+                JSONObject obj = jsonArray.getJSONObject(i);
+                if (obj.getString("phone").equals(phone)) {
+                    // 更新对象的属性
+                    obj.put("U_SName", name);
+                    jsonArray.set(i, obj);
+                    break;
+                }
+            }
+        }
+
+
+        try (FileWriter fileWriter = new FileWriter(filePath)) {
+            fileWriter.write(jsonArray.toJSONString());
+            return true;
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        return false;
+    }
+
     /**
      * 保存用户phone到组文件
      * @param mark
@@ -174,6 +217,30 @@ public class HeadersUtils {
             return false;
         }
     }
+
+    /**
+     * 获取组下所有用户的电话号码
+     * @param mark
+     * @return
+     */
+    public static JSONArray getStoreUserJoinGroup (String mark) {
+        String fileName = mark + ".json";
+//        File file = new File(fileName);
+
+        JSONArray jsonArray = null;
+        try {
+            String content = new String(Files.readAllBytes(Paths.get(fileName)));
+            if (StringUtils.isEmpty(content)) {
+                jsonArray = new JSONArray();
+            }else {
+                jsonArray = JSONArray.parseArray(content);
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        return jsonArray;
+    }
     
     
     public static boolean hasUser(String phone) {
@@ -213,8 +280,36 @@ public class HeadersUtils {
             for (int i = 0; i < jsonArray.size(); i++) {
                 JSONObject obj = jsonArray.getJSONObject(i);
                 if (obj.getString("phone").equals(phoneNumber)) {
+                    // 移除另外两个字段
                     obj.remove("phone");
+                    obj.remove("U_SName");
+                    return obj;
+                }
+            }
+        }
+        return null;
+    }
 
+    public static JSONObject getUserAll(String phoneNumber) {
+        // 获取原先数据
+        String filePath = "user.json"; // 指定的文件目录
+
+        JSONArray jsonArray;
+        try {
+            String content = new String(Files.readAllBytes(Paths.get(filePath)));
+            if (StringUtils.isEmpty(content)) {
+                jsonArray = new JSONArray();
+            }else {
+                jsonArray = JSONArray.parseArray(content);
+            }
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+
+        if (!ObjectUtil.isEmpty(jsonArray)) {
+            for (int i = 0; i < jsonArray.size(); i++) {
+                JSONObject obj = jsonArray.getJSONObject(i);
+                if (obj.getString("phone").equals(phoneNumber)) {
                     return obj;
                 }
             }
@@ -375,4 +470,6 @@ public class HeadersUtils {
         }
         return stringBuilder.toString();
     }
+
+
 }
