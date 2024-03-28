@@ -8,6 +8,7 @@ import com.cheng.xxtsign.utils.HeadersUtils;
 import com.cheng.xxtsign.vo.CourseVo;
 import com.cheng.xxtsign.vo.UserLoginVo;
 import okhttp3.*;
+import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.stereotype.Service;
@@ -42,36 +43,23 @@ public class DefaultXXTUserServiceImpl implements XXTUserService {
             return false;
         }
 
-//        RestTemplate restTemplate = new RestTemplate();
-//
-//        // 请求头
-//        HttpHeaders httpHeaders = customRequestHeader();
-//
         // 请求体
         String encryptPhone = HeadersUtils.encrypt(phone, phoneSecret, phoneSecret);
         String encryptPassword = HeadersUtils.encrypt(password, phoneSecret, phoneSecret);
-
         UserLoginVo userLoginVo = new UserLoginVo();
         userLoginVo.setUname(encryptPhone);
         userLoginVo.setPassword(encryptPassword);
         userLoginVo.setRefer(userDataRefer);
-//
-//
-//        HttpEntity<String> entity = new HttpEntity<>(httpHeaders);
-//
-//        // 发送带有请求头的POST请求
-//        ResponseEntity<String> response1 = restTemplate.exchange(loginUrl, HttpMethod.POST, entity, String.class);
 
+
+
+        HeadersUtils.requestToXXT(loginUrl, "POST", customRequestHeader(), HeadersUtils.objectToMap(userLoginVo));
 
         OkHttpClient client = new OkHttpClient();
 
-
-        // 创建一个CookieJar来保存会话信息
-        XXTCookieJar xxtCookieJar = new XXTCookieJar();
-
-        client = client.newBuilder()
+        client = client.newBuilder().build();
 //                .cookieJar(xxtCookieJar)
-                .build();
+
 
         // 构建一个POST请求，添加数据
 //        RequestBody requestBody = RequestBody.create(JSONObject.toJSONString(userLoginVo), JSON);
@@ -106,7 +94,7 @@ public class DefaultXXTUserServiceImpl implements XXTUserService {
         try {
             Response response = client.newCall(request).execute();
             String responseBody = response.body().string();
-            System.out.println("Response: " + responseBody);
+//            System.out.println("Response: " + responseBody);
 
             JSONObject jsonObject = JSONObject.parseObject(responseBody);
             if(jsonObject.getString("status").equals("true")) {
@@ -129,9 +117,10 @@ public class DefaultXXTUserServiceImpl implements XXTUserService {
 
                 // 保存数据到本地
                 HeadersUtils.storeUser(phone, jsonObject1);
+            }else {
+                // 登录失败
+                return false;
             }
-
-
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -593,6 +582,33 @@ public class DefaultXXTUserServiceImpl implements XXTUserService {
         return randomString;
     }
 
+    /**
+     * 用户加入组
+     * @param mark 组的标识
+     * @param phone 电话号码
+     * @return
+     */
+    @Override
+    public boolean join(String mark, String phone) {
+        /**
+         * 1. 先检查是否有这个组（有没有这个文件）
+         * 2. 检查有没有这个用户
+         * 3. 加入到文件中
+         */
+        if (StringUtils.isEmpty(phone) && StringUtils.isEmpty(mark)) {
+            return false;
+        }
+        // 1. 先检查是否有这个组（有没有这个文件）// 2. 检查有没有这个用户
+        if (!HeadersUtils.hasJsonFile(mark) || !HeadersUtils.hasUser(phone)) {
+            return false;
+        }
+        // 3. 加入到文件中
+        if (HeadersUtils.storeUserJoinGroup(mark, phone)){
+            return true;
+        }
+
+        return false;
+    }
 
     public static void main(String[] args) {
         JSONObject user = HeadersUtils.getUser("13018436372");
@@ -611,6 +627,8 @@ public class DefaultXXTUserServiceImpl implements XXTUserService {
 
         // 普通签到
         if (jsonObject.getString("otherId").equals("0")) {
+            defaultXXTUserService.generalSign(user, jsonObject.getString("activeId"), userInfo);
+        } else if (jsonObject.getString("otherId").equals("3")) {
             defaultXXTUserService.generalSign(user, jsonObject.getString("activeId"), userInfo);
         } else if (jsonObject.getString("otherId").equals("4")) {
             defaultXXTUserService.locationSign(user, jsonObject.getString("activeId"), userInfo);
