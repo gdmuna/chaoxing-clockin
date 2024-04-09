@@ -4,6 +4,14 @@ on:
   push:
     branches:
       - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      tags:
+        description: 'Manual Build'
+        required: false
 
 jobs:
   build-and-publish:
