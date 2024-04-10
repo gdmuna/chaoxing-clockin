@@ -39,7 +39,7 @@ public class DefaultXXTSignService implements XXTSignService {
                 // 现在是一个用户
                 JSONObject obj = HeadersUtils.getUser(storeUserJoinGroup.getJSONObject(i).getString("phone"));
                 JSONObject userAll = HeadersUtils.getUserAll(storeUserJoinGroup.getJSONObject(i).getString("phone"));
-                String phone = userAll.getString("phone");
+//                String phone = userAll.getString("phone");
                 String uSName = userAll.getString("U_SName");
 
                 //
