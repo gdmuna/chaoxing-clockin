@@ -10,4 +10,4 @@ WORKDIR /opt
 
 COPY --chown=root:root ./app.jar ./app.jar
 
-CMD ["java", "-jar", "xxt-sign.jar"]
+CMD ["java", "-jar", "app.jar"]
