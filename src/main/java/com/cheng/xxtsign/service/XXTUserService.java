@@ -29,4 +29,12 @@ public interface XXTUserService {
      * @param au 权限标识
      */
     void addGroup(String mark, String au);
+
+    /**
+     * 从组内移除成员
+     * @param mark
+     * @param phone
+     * @param au
+     */
+    boolean delUser(String mark, String phone, String au);
 }

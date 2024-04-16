@@ -603,6 +603,46 @@ public class DefaultXXTUserServiceImpl implements XXTUserService {
         }
     }
 
+    @Override
+    public boolean delUser(String mark, String phone, String au) {
+        // todo: 魔术
+        String AU = "admin_del";
+        if (!au.equals(AU)) {
+            throw new XXTUserException("你没有移除权限");
+        }
+
+        String filePath = mark + ".json";
+
+        if (!XXTHttpRequestUtils.hasJsonFile(mark)) {
+            throw new XXTUserException("不存在组");
+        }
+        if (!XXTHttpRequestUtils.hasUser(phone)) {
+            throw new XXTUserException("不存用户");
+        }
+
+        JSONArray userListByMark = xxtUserMapper.getUserListByMark(mark);
+
+        if (!ObjectUtil.isEmpty(userListByMark)) {
+            for (int i = 0; i < userListByMark.size(); i++) {
+                JSONObject obj = userListByMark.getJSONObject(i);
+                if (obj.getString("phone").equals(phone)) {
+                    userListByMark.remove(i);
+                    break;
+                }
+            }
+        }
+
+        // 保存
+        try (FileWriter fileWriter = new FileWriter(filePath)) {
+            fileWriter.write(userListByMark.toJSONString());
+
+            return true;
+        } catch (IOException e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+
     public static void main(String[] args) {
         JSONObject user = XXTHttpRequestUtils.getUser("15992601106");
         DefaultXXTUserServiceImpl defaultXXTUserService = new DefaultXXTUserServiceImpl();

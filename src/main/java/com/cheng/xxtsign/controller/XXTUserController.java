@@ -50,12 +50,28 @@ public class XXTUserController {
     }
 
     /**
+     * 移除组内的用户
+     * @param mark 组标识
+     * @param phone 移除用户的号码
+     * @param au 权限标识
+     * @return
+     */
+    @GetMapping("/group/del")
+    public CommonResult delUser(@RequestParam("mark") String mark, @RequestParam("phone") String phone,
+                                @RequestParam("au") String au){
+        if (xxtUserService.delUser(mark, phone, au)) {
+            return CommonResult.success("移除成功");
+        }
+        return CommonResult.success("移除失败|此用户不在组内");
+    }
+
+    /**
      * 创建组
      * @param mark 组的标识
      * @return
      */
     @GetMapping("/group/add")
-    public CommonResult createGroup(@RequestParam("mark") String mark, @RequestParam("Au") String au){
+    public CommonResult createGroup(@RequestParam("mark") String mark, @RequestParam("au") String au){
         xxtUserService.addGroup(mark, au);
         return CommonResult.success("操作完成");
     }
