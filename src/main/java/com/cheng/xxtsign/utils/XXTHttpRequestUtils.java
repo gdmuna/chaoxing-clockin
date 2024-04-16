@@ -4,10 +4,9 @@ import cn.hutool.core.map.MapUtil;
 import cn.hutool.core.util.ObjectUtil;
 import com.alibaba.fastjson2.JSONArray;
 import com.alibaba.fastjson2.JSONObject;
-import com.cheng.xxtsign.vo.CourseVo;
+import com.cheng.xxtsign.dao.vo.CourseVo;
 import okhttp3.*;
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 import org.springframework.util.StringUtils;
 
 import javax.crypto.Cipher;
@@ -23,8 +22,9 @@ import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.zip.GZIPInputStream;
+import java.time.LocalDate;
 
-public class HeadersUtils {
+public class XXTHttpRequestUtils {
 
     public static Map<String, String> headers = new HashMap<>();
 
@@ -49,6 +49,13 @@ public class HeadersUtils {
         return headers;
     }
 
+    /**
+     * 加密账号和密码
+     * @param msg
+     * @param key
+     * @param iv
+     * @return
+     */
     public static String encrypt(String msg, String key, String iv) {
         try {
             Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
@@ -63,13 +70,16 @@ public class HeadersUtils {
         return null;
     }
 
+    /**
+     * 保存用户登录产生的cookie
+     * @param phoneNumber
+     * @param newObj
+     */
     public static void storeUser(String phoneNumber, JSONObject newObj) {
-        // 获取原先数据
+        // 获取原先数据 todo:魔术值替换
         String filePath = "user.json"; // 指定的文件目录
-
         File file = new File(filePath);
         JSONArray jsonArray;
-
         newObj.put("phone", phoneNumber);
 
         // 判断文件是否存在
@@ -119,6 +129,13 @@ public class HeadersUtils {
         }
     }
 
+    /**
+     * 保存用户名到本地缓存文件
+     * 默认以此时间为登录时间
+     * @param name 用户名
+     * @param phone 电话号码
+     * @return
+     */
     public static boolean storeUserName(String name, String phone) {
         // 获取原先数据
         String filePath = "user.json"; // 指定的文件目录
@@ -137,12 +154,15 @@ public class HeadersUtils {
             return false;
         }
 
+        // 获取当前日期
+        LocalDate currentDate = LocalDate.now();
 
         if (!ObjectUtil.isEmpty(jsonArray)) {
             for (int i = 0; i < jsonArray.size(); i++) {
                 JSONObject obj = jsonArray.getJSONObject(i);
                 if (obj.getString("phone").equals(phone)) {
                     // 更新对象的属性
+                    obj.put("Login_Sign_System_Time", currentDate.toString());
                     obj.put("U_SName", name);
                     jsonArray.set(i, obj);
                     break;
@@ -393,6 +413,11 @@ public class HeadersUtils {
         return requestToXXT(url, method, header, null);
     }
 
+    /**
+     * 将对象转化为键值对Map
+     * @param obj
+     * @return
+     */
     public static Map<String, String> objectToMap(Object obj) {
         Map<String, String> map = new HashMap<>();
         Field[] fields = obj.getClass().getDeclaredFields();

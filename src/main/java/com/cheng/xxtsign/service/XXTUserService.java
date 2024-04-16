@@ -12,4 +12,10 @@ public interface XXTUserService {
 
 
     boolean join(String mark, String phone);
+
+    /**
+     * 获取加入组的成员信息
+     * @param mark 组标识
+     */
+    void getUserListByMark(String mark);
 }

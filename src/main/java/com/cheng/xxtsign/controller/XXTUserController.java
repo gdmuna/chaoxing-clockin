@@ -18,7 +18,6 @@ public class XXTUserController {
         if (xxtUserService.userLogin(phone, password)) {
             return CommonResult.success("登录成功");
         }
-
         return CommonResult.success("登录失败");
     }
 
@@ -34,5 +33,26 @@ public class XXTUserController {
             return CommonResult.success("加入成功");
         }
         return CommonResult.success("请检查组标识或者手机号码正确性，请确保此号码已经在本系统登录");
+    }
+
+    /**
+     * 查看组内成员和联系方式
+     * @param mark
+     * @return
+     */
+    @GetMapping("/group/info")
+    public CommonResult groupUserList(@RequestParam("mark") String mark){
+        xxtUserService.getUserListByMark(mark);
+        return CommonResult.success("还在开发中");
+    }
+
+    /**
+     * 创建组
+     * @param mark 组的标识
+     * @return
+     */
+    public CommonResult createGroup(@RequestParam("mark") String mark){
+        xxtUserService.getUserListByMark(mark);
+        return CommonResult.success("还在开发中");
     }
 }

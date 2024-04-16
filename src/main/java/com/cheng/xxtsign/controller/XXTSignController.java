@@ -8,6 +8,9 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+/**
+ * 各种签到的接口
+ */
 @RestController
 @RequestMapping("/sign")
 public class XXTSignController {
@@ -16,10 +19,10 @@ public class XXTSignController {
     private XXTSignService xxtSignService;
 
     /**
-     * 普通签到 位置签到
+     * 普通签到 位置签到 签到码签到 手势签到
      * 帮一个组的人统一签到
-     * @param mark
-     * @return
+     * @param mark 组标识
+     * @return 返回一个list,标明签到者和签到关系
      */
     @GetMapping("/group/general")
     public CommonResult generalGroup(@RequestParam("mark") String mark, @RequestParam("lo") String location) {
@@ -27,32 +30,14 @@ public class XXTSignController {
     }
 
     /**
-     * 位置签到
-     * 帮一个组的人统一签到
-     */
-//    @GetMapping("/group/location")
-//    public CommonResult location(@RequestParam("lo") String longitude, @RequestParam("lat") String latitude) {
-//
-//        return CommonResult.success("全部签到完成");
-//    }
-
-    /**
-     * 普通签到 位置签到
+     * 普通签到 位置签到 签到码签到 手势签到
+     * 个人签到
+     * @param phone 个人的电话号码（xxt账号）
+     * @param location 位置参数，参考枚举LocationSignEnum，给定你的位置参数，不是位置签到不会使用此参数（填什么都可以）
+     * @return 用户：签到成功|签到失败
      */
     @GetMapping("/general")
     public CommonResult general(@RequestParam("phone") String phone, @RequestParam("lo") String location) {
         return CommonResult.success(xxtSignService.generalSign(phone, location));
     }
-
-    /**
-     * 签到码签到
-     * @param longitude
-     * @param latitude
-     * @return
-     */
-//    @GetMapping("/group/location")
-//    public CommonResult location(@RequestParam("lo") String longitude, @RequestParam("lat") String latitude) {
-//
-//        return CommonResult.success("全部签到完成");
-//    }
 }

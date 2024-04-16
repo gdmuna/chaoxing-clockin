@@ -1,5 +1,8 @@
 package com.cheng.xxtsign.enums;
 
+/**
+ * 位点坐标（尽量选中心）
+ */
 public enum LocationSignEnum {
 
     GDMU_A(113.868723, 22.929767),
@@ -12,6 +15,8 @@ public enum LocationSignEnum {
     GDMU_H(113.870107, 22.928327),
     // 实验楼
     GDMU_S(113.869437, 22.928003),
+    // 科技大楼
+    GDMU_K(113.872446, 22.927912)
     ;
 
     // 经度

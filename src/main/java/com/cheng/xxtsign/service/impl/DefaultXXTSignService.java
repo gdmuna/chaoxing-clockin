@@ -4,8 +4,8 @@ import cn.hutool.core.util.ObjectUtil;
 import com.alibaba.fastjson2.JSONArray;
 import com.alibaba.fastjson2.JSONObject;
 import com.cheng.xxtsign.service.XXTSignService;
-import com.cheng.xxtsign.utils.HeadersUtils;
-import com.cheng.xxtsign.vo.CourseVo;
+import com.cheng.xxtsign.utils.XXTHttpRequestUtils;
+import com.cheng.xxtsign.dao.vo.CourseVo;
 import okhttp3.Response;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
@@ -21,10 +21,10 @@ public class DefaultXXTSignService implements XXTSignService {
 
     @Override
     public String generalGroupSign(String mark, String location) {
-        if (!HeadersUtils.hasJsonFile(mark)) {
+        if (!XXTHttpRequestUtils.hasJsonFile(mark)) {
             return "没有组";
         }
-        JSONArray storeUserJoinGroup = HeadersUtils.getStoreUserJoinGroup(mark);
+        JSONArray storeUserJoinGroup = XXTHttpRequestUtils.getStoreUserJoinGroup(mark);
         if (storeUserJoinGroup.isEmpty()) {
             return "没有用户";
         }
@@ -37,8 +37,8 @@ public class DefaultXXTSignService implements XXTSignService {
             for (int i = 0; i < storeUserJoinGroup.size(); i++) {
 
                 // 现在是一个用户
-                JSONObject obj = HeadersUtils.getUser(storeUserJoinGroup.getJSONObject(i).getString("phone"));
-                JSONObject userAll = HeadersUtils.getUserAll(storeUserJoinGroup.getJSONObject(i).getString("phone"));
+                JSONObject obj = XXTHttpRequestUtils.getUser(storeUserJoinGroup.getJSONObject(i).getString("phone"));
+                JSONObject userAll = XXTHttpRequestUtils.getUserAll(storeUserJoinGroup.getJSONObject(i).getString("phone"));
 //                String phone = userAll.getString("phone");
                 String uSName = userAll.getString("U_SName");
 
@@ -107,8 +107,8 @@ public class DefaultXXTSignService implements XXTSignService {
     public String generalSign(String phone, String location) {
         boolean b = false;
         // 现在是一个用户
-        JSONObject obj = HeadersUtils.getUser(phone);
-        JSONObject userAll = HeadersUtils.getUserAll(phone);
+        JSONObject obj = XXTHttpRequestUtils.getUser(phone);
+        JSONObject userAll = XXTHttpRequestUtils.getUserAll(phone);
         String uSName = userAll.getString("U_SName");
 
 
@@ -171,7 +171,7 @@ public class DefaultXXTSignService implements XXTSignService {
      */
     public static String getSignCode(String activeId) {
         String url = "https://mobilelearn.chaoxing.com/widget/sign/pcTeaSignController/showSignInfo?activeId=" + activeId;
-        Map<String, String> headers = HeadersUtils.getHeaders();
+        Map<String, String> headers = XXTHttpRequestUtils.getHeaders();
         headers.put("Referer", "http://x.chaoxing.com/");
         headers.put("Proxy-Connection", "keep-alive");
         headers.put("Connection", "None");
@@ -179,7 +179,7 @@ public class DefaultXXTSignService implements XXTSignService {
         headers.put("Sec-Fetch-Mode", "None");
         headers.put("Sec-Fetch-Site", "None");
 
-        Response response = HeadersUtils.requestToXXT(url, "GET", headers);
+        Response response = XXTHttpRequestUtils.requestToXXT(url, "GET", headers);
 
         try {
             String string = response.body().string();
