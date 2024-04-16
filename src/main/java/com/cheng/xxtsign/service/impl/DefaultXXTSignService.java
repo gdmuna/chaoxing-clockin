@@ -257,7 +257,7 @@ public class DefaultXXTSignService implements XXTSignService {
         headerMap.put("Accept-Encoding", "gzip, deflate");
         headerMap.put("Accept-Language", "zh-CN,zh;q=0.9,en;q=0.8,en-GB;q=0.7,en-US;q=0.6");
         headerMap.put("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8");
-        headerMap.put("Cookie", "_uid=" + uid + "; _d=" + d + "; vc3=" + v3);
+        headerMap.put("Cookie", "_uid=" + uid + "; _d=" + d + "; vc3=" + vc3);
 
         // 请求体
         Map<String, String> paramMap = new HashMap<>();
@@ -285,8 +285,6 @@ public class DefaultXXTSignService implements XXTSignService {
                 response.close();
             }
         }
-
-        return null;
     }
 
 
