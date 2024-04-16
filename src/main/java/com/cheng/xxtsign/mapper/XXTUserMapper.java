@@ -8,4 +8,6 @@ public interface XXTUserMapper {
     JSONObject getUserByPhone(String phone);
 
     JSONArray getUserListByMark(String mark);
+
+    int insertUserToGroup(JSONObject user, String mark);
 }

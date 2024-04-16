@@ -17,8 +17,10 @@ public class XXTUserVO {
 
     public void setAgainLoginTime(String againLoginTime){
         // 将日期字符串转换为LocalDate对象
-        LocalDate parsedDate = LocalDate.parse(againLoginTime);
-        LocalDate localDate = parsedDate.plusDays(29);
-        this.againLoginTime = localDate.toString();
+        if (againLoginTime != null) {
+            LocalDate parsedDate = LocalDate.parse(againLoginTime);
+            LocalDate localDate = parsedDate.plusDays(29);
+            this.againLoginTime = localDate.toString();
+        }
     }
 }

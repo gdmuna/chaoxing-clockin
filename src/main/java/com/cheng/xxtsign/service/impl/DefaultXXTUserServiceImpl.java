@@ -1,11 +1,13 @@
 package com.cheng.xxtsign.service.impl;
 
 import cn.hutool.core.util.ObjectUtil;
+import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONArray;
 import com.alibaba.fastjson2.JSONObject;
 import com.cheng.xxtsign.dao.vo.XXTUserVO;
 import com.cheng.xxtsign.enums.LocationSignEnum;
 import com.cheng.xxtsign.exception.user.XXTUserException;
+import com.cheng.xxtsign.mapper.XXTUserMapper;
 import com.cheng.xxtsign.service.XXTUserService;
 import com.cheng.xxtsign.utils.XXTHttpRequestUtils;
 import com.cheng.xxtsign.dao.vo.CourseVo;
@@ -13,6 +15,7 @@ import com.cheng.xxtsign.dao.vo.UserLoginVo;
 import lombok.extern.java.Log;
 import okhttp3.*;
 import org.jetbrains.annotations.Nullable;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
@@ -35,7 +38,10 @@ public class DefaultXXTUserServiceImpl implements XXTUserService {
     @Value("${xxt.user.refer}")
     private String userDataRefer;
 
-    public static final MediaType JSON = MediaType.parse("application/json; charset=utf-8");
+    @Autowired
+    private XXTUserMapper xxtUserMapper;
+
+//    public static final MediaType JSON = MediaType.parse("application/json; charset=utf-8");
 
     @Override
     public boolean userLogin(String phone, String password) {
@@ -529,35 +535,73 @@ public class DefaultXXTUserServiceImpl implements XXTUserService {
             throw new XXTUserException("用户未登录或者不存在组");
         }
         // 3. 加入到文件中
-        if (XXTHttpRequestUtils.storeUserJoinGroup(mark, phone)){
+        JSONObject user = xxtUserMapper.getUserByPhone(phone);
+        int insertUserToGroup = xxtUserMapper.insertUserToGroup(user, mark);
+        if (insertUserToGroup == 1) {
             return true;
         }
+
         return false;
     }
 
 
     @Override
-    public void getUserListByMark(String mark) {
+    public List<XXTUserVO> getUserListByMark(String mark) {
         if (!XXTHttpRequestUtils.hasJsonFile(mark)) {
             throw new XXTUserException("不存在组");
         }
         // 获取组内用户名字和联系方式等
-        ArrayList<XXTUserVO> xxtUserVOS = new ArrayList<>();
+        List<XXTUserVO> xxtUserVOS = new ArrayList<>();
+        JSONArray userListByMark = xxtUserMapper.getUserListByMark(mark);
 
-        JSONArray jsonArray = null;
-        try {
-            String content = new String(Files.readAllBytes(Paths.get(mark+".json")));
-            if (StringUtils.isEmpty(content)) {
-                jsonArray = new JSONArray();
-            }else {
-                jsonArray = JSONArray.parseArray(content);
-            }
-        } catch (IOException e) {
-            e.printStackTrace();
+        // 遍历 JSONArray 中的每个 JSON 对象，并将其转换为 XXTUserVO 对象
+        for (int i = 0; i < userListByMark.size(); i++) {
+            JSONObject jsonObject = userListByMark.getJSONObject(i);
+            XXTUserVO xxtUserVO = new XXTUserVO();
+            // todo: 魔术
+            xxtUserVO.setName(jsonObject.getString("U_SName"));
+            xxtUserVO.setPhone(jsonObject.getString("phone"));
+            xxtUserVO.setLoginTime(jsonObject.getString("Login_Sign_System_Time"));
+            xxtUserVO.setAgainLoginTime(jsonObject.getString("Login_Sign_System_Time"));
+            xxtUserVOS.add(xxtUserVO);
         }
+
+        return xxtUserVOS;
     }
 
+    @Override
+    public void addGroup(String mark, String au) {
+        // todo: 魔术
+        String AU = "cheng_admin";
+        if (!au.equals(AU)) {
+            throw new XXTUserException("你没有创建权限");
+        }
 
+        String filePath = mark + ".json";
+
+        // 创建一个 File 对象
+        File file = new File(filePath);
+
+        // 检查文件是否存在
+        if (file.exists()) {
+            throw new XXTUserException("此组已经创建");
+        } else {
+            try {
+                // 尝试创建空文件
+                boolean created = file.createNewFile();
+
+//                if (created) {
+//                    System.out.println("Empty file created successfully: " + filePath);
+//                } else {
+//                    System.out.println("File could not be created.");
+//                }
+            } catch (IOException e) {
+//                System.out.println("An error occurred while creating the file.");
+                e.printStackTrace();
+                throw new XXTUserException("创建组错误");
+            }
+        }
+    }
 
     public static void main(String[] args) {
         JSONObject user = XXTHttpRequestUtils.getUser("15992601106");
