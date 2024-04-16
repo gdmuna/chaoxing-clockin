@@ -382,10 +382,17 @@ public class DefaultXXTUserServiceImpl implements XXTUserService {
     }
 
     // 普通签到
-    public boolean generalSign(JSONObject cookie, String activeId, String name) {
+    public boolean generalSign(JSONObject cookie, String activeId, String name, String signCode) {
         // get
-        String url = "https://mobilelearn.chaoxing.com/pptSign/stuSignajax?activeId=" + activeId + "&uid=" + cookie.getString("_uid") +
-                "&clientip=&latitude=-1&longitude=-1&appType=15&fid=" + cookie.getString("fid") + "&name=" + name;
+        String url;
+
+        if (StringUtils.isEmpty(signCode)) {
+            url = "https://mobilelearn.chaoxing.com/pptSign/stuSignajax?activeId=" + activeId + "&uid=" + cookie.getString("_uid") +
+                    "&clientip=&latitude=-1&longitude=-1&appType=15&fid=" + cookie.getString("fid") + "&name=" + name;
+        }else {
+            url = "https://mobilelearn.chaoxing.com/pptSign/stuSignajax?activeId=" + activeId + "&signCode=" + signCode + "&uid=" + cookie.getString("_uid") +
+                    "&clientip=&latitude=-1&longitude=-1&appType=15&fid=" + cookie.getString("fid") + "&name=" + name;
+        }
 
         HashMap<String, String> headerMap = new HashMap<>();
         headerMap.put("Cookie", HeadersUtils.jsonToHeader(cookie));
@@ -405,6 +412,7 @@ public class DefaultXXTUserServiceImpl implements XXTUserService {
 
         return false;
     }
+
 
     public boolean locationSign(JSONObject cookie, String activeId, String name) {
 
@@ -537,13 +545,13 @@ public class DefaultXXTUserServiceImpl implements XXTUserService {
             defaultXXTUserService.preSign(jsonObject, user);
 
             // 普通签到
-            if (jsonObject.getString("otherId").equals("0")) {
-                defaultXXTUserService.generalSign(user, jsonObject.getString("activeId"), userInfo);
-            } else if (jsonObject.getString("otherId").equals("3")) {
-                defaultXXTUserService.generalSign(user, jsonObject.getString("activeId"), userInfo);
-            } else if (jsonObject.getString("otherId").equals("4")) {
-                defaultXXTUserService.locationSign(user, jsonObject.getString("activeId"), userInfo);
-            }
+//            if (jsonObject.getString("otherId").equals("0")) {
+//                defaultXXTUserService.generalSign(user, jsonObject.getString("activeId"), userInfo);
+//            } else if (jsonObject.getString("otherId").equals("3")) {
+//                defaultXXTUserService.generalSign(user, jsonObject.getString("activeId"), userInfo);
+//            } else if (jsonObject.getString("otherId").equals("4")) {
+//                defaultXXTUserService.locationSign(user, jsonObject.getString("activeId"), userInfo);
+//            }
         }
 
 

@@ -290,7 +290,7 @@ public class HeadersUtils {
         return null;
     }
 
-    public static JSONObject getUserAll(String phoneNumber) {
+    public static synchronized JSONObject getUserAll(String phoneNumber) {
         // 获取原先数据
         String filePath = "user.json"; // 指定的文件目录
 
