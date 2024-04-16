@@ -301,6 +301,7 @@ public class XXTHttpRequestUtils {
                 JSONObject obj = jsonArray.getJSONObject(i);
                 if (obj.getString("phone").equals(phoneNumber)) {
                     // 移除另外两个字段
+                    obj.remove("Login_Sign_System_Time");
                     obj.remove("phone");
                     obj.remove("U_SName");
                     return obj;

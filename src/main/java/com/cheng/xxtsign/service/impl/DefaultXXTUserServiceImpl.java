@@ -327,7 +327,8 @@ public class DefaultXXTUserServiceImpl implements XXTUserService {
 
         // 第一次预先请求
         XXTHttpRequestUtils.requestToXXT(url, "GET", headerMap);
-        System.out.println("预先请求完成1");
+//        System.out.println("预先请求完成1");
+        log.info("完成签到预先请求1");
 
         // 第二次
         analysisResult(activity, cookie);
@@ -341,10 +342,8 @@ public class DefaultXXTUserServiceImpl implements XXTUserService {
         headerMap.put("Cookie", XXTHttpRequestUtils.jsonToHeader(cookie));
 
         // 第二次预先请求
-        Response response = XXTHttpRequestUtils.requestToXXT(url, "GET", headerMap);
-        System.out.println("预先请求完成2");
-
-        try {
+        try (Response response = XXTHttpRequestUtils.requestToXXT(url, "GET", headerMap)) {
+            log.info("完成签到预先请求2");
             String code = response.body().string();
 //            JSONObject jsonData = JSONObject.parseObject(string);
 //
@@ -374,14 +373,13 @@ public class DefaultXXTUserServiceImpl implements XXTUserService {
         headerMap.put("Cookie", XXTHttpRequestUtils.jsonToHeader(cookie));
 
         // 第二次预先请求
-        Response response = XXTHttpRequestUtils.requestToXXT(url, "GET", headerMap);
-        System.out.println("预先请求完成3");
-
-        try {
+        try (Response response = XXTHttpRequestUtils.requestToXXT(url, "GET", headerMap)) {
+            log.info("完成签到预先请求3");
             String string = response.body().string();
-            System.out.println("预先请求结果：" + string);
+            log.info("预先请求结果: " + string);
         } catch (IOException e) {
-            throw new RuntimeException(e);
+            e.printStackTrace();
+            throw new XXTUserException("预请求失败");
         }
 
         // Sleep for 500ms
@@ -462,9 +460,12 @@ public class DefaultXXTUserServiceImpl implements XXTUserService {
             } else if (location.equals("GDMUH")) {
                 longitude = randomCenterValue(LocationSignEnum.GDMU_H.getLongitude());
                 latitude = randomCenterValue(LocationSignEnum.GDMU_H.getLatitude());
-            } else if (location.equals("S")) {
+            } else if (location.equals("GDMUS")) {
                 longitude = randomCenterValue(LocationSignEnum.GDMU_S.getLongitude());
                 latitude = randomCenterValue(LocationSignEnum.GDMU_S.getLatitude());
+            } else if (location.equals("GDMUK")) {
+                longitude = randomCenterValue(LocationSignEnum.GDMU_K.getLongitude());
+                latitude = randomCenterValue(LocationSignEnum.GDMU_K.getLatitude());
             }
         }
 

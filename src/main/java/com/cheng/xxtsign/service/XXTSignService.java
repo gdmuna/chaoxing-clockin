@@ -1,8 +1,10 @@
 package com.cheng.xxtsign.service;
 
+import java.util.List;
+
 public interface XXTSignService {
 
-    String generalGroupSign(String mark, String location);
+    List<String> generalGroupSign(String mark, String location);
 
     String generalSign(String phone, String location);
 }
