@@ -1,4 +1,4 @@
-package com.cheng.xxtsign.vo;
+package com.cheng.xxtsign.dao.vo;
 
 import lombok.Data;
 

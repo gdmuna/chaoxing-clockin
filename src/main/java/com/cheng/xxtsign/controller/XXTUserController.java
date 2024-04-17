@@ -1,9 +1,12 @@
 package com.cheng.xxtsign.controller;
 
 import com.cheng.xxtsign.common.CommonResult;
+import com.cheng.xxtsign.dao.vo.XXTUserVO;
 import com.cheng.xxtsign.service.XXTUserService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 
 @RestController
 @RequestMapping("/user")
@@ -18,7 +21,6 @@ public class XXTUserController {
         if (xxtUserService.userLogin(phone, password)) {
             return CommonResult.success("登录成功");
         }
-
         return CommonResult.success("登录失败");
     }
 
@@ -34,5 +36,43 @@ public class XXTUserController {
             return CommonResult.success("加入成功");
         }
         return CommonResult.success("请检查组标识或者手机号码正确性，请确保此号码已经在本系统登录");
+    }
+
+    /**
+     * 查看组内成员和联系方式
+     * @param mark
+     * @return
+     */
+    @GetMapping("/group/info")
+    public CommonResult groupUserList(@RequestParam("mark") String mark){
+        List<XXTUserVO> userListByMark = xxtUserService.getUserListByMark(mark);
+        return CommonResult.success(userListByMark);
+    }
+
+    /**
+     * 移除组内的用户
+     * @param mark 组标识
+     * @param phone 移除用户的号码
+     * @param au 权限标识
+     * @return
+     */
+    @GetMapping("/group/del")
+    public CommonResult delUser(@RequestParam("mark") String mark, @RequestParam("phone") String phone,
+                                @RequestParam("au") String au){
+        if (xxtUserService.delUser(mark, phone, au)) {
+            return CommonResult.success("移除成功");
+        }
+        return CommonResult.success("移除失败|此用户不在组内");
+    }
+
+    /**
+     * 创建组
+     * @param mark 组的标识
+     * @return
+     */
+    @GetMapping("/group/add")
+    public CommonResult createGroup(@RequestParam("mark") String mark, @RequestParam("au") String au){
+        xxtUserService.addGroup(mark, au);
+        return CommonResult.success("操作完成");
     }
 }

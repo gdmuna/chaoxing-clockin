@@ -1,34 +1,34 @@
 package com.cheng.xxtsign.service.impl;
 
 import cn.hutool.core.util.ObjectUtil;
+import com.alibaba.fastjson2.JSON;
+import com.alibaba.fastjson2.JSONArray;
 import com.alibaba.fastjson2.JSONObject;
-import com.cheng.xxtsign.dao.cookie.XXTCookieJar;
+import com.cheng.xxtsign.dao.vo.XXTUserVO;
 import com.cheng.xxtsign.enums.LocationSignEnum;
+import com.cheng.xxtsign.exception.user.XXTUserException;
+import com.cheng.xxtsign.mapper.XXTUserMapper;
 import com.cheng.xxtsign.service.XXTUserService;
-import com.cheng.xxtsign.utils.HeadersUtils;
-import com.cheng.xxtsign.vo.CourseVo;
-import com.cheng.xxtsign.vo.UserLoginVo;
+import com.cheng.xxtsign.utils.XXTHttpRequestUtils;
+import com.cheng.xxtsign.dao.vo.CourseVo;
+import com.cheng.xxtsign.dao.vo.UserLoginVo;
+import lombok.extern.java.Log;
 import okhttp3.*;
-import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import org.springframework.beans.BeanUtils;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.HttpHeaders;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
-
 import java.io.*;
-import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.text.DecimalFormat;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
-import java.util.zip.GZIPInputStream;
 
-import static cn.hutool.core.util.URLUtil.url;
 
 @Service
+@Log
 public class DefaultXXTUserServiceImpl implements XXTUserService {
 
     @Value("${xxt.user.loginUrl}")
@@ -38,67 +38,74 @@ public class DefaultXXTUserServiceImpl implements XXTUserService {
     @Value("${xxt.user.refer}")
     private String userDataRefer;
 
-    public static final MediaType JSON = MediaType.parse("application/json; charset=utf-8");
+    @Autowired
+    private XXTUserMapper xxtUserMapper;
+
+//    public static final MediaType JSON = MediaType.parse("application/json; charset=utf-8");
 
     @Override
     public boolean userLogin(String phone, String password) {
         if (StringUtils.isEmpty(phone) && StringUtils.isEmpty(password)) {
-            return false;
+            throw new XXTUserException("电话号码或者密码为空");
         }
 
         // 请求体
-        String encryptPhone = HeadersUtils.encrypt(phone, phoneSecret, phoneSecret);
-        String encryptPassword = HeadersUtils.encrypt(password, phoneSecret, phoneSecret);
+        String encryptPhone = XXTHttpRequestUtils.encrypt(phone, phoneSecret, phoneSecret);
+        String encryptPassword = XXTHttpRequestUtils.encrypt(password, phoneSecret, phoneSecret);
+
         UserLoginVo userLoginVo = new UserLoginVo();
         userLoginVo.setUname(encryptPhone);
         userLoginVo.setPassword(encryptPassword);
         userLoginVo.setRefer(userDataRefer);
 
-
-        Response response = HeadersUtils.requestToXXT(loginUrl, "POST", customRequestHeader(),
-                HeadersUtils.objectToMap(userLoginVo));
-
-
+        Response response = null;
         try {
+            response = XXTHttpRequestUtils.requestToXXT(loginUrl, "POST", customRequestHeader(),
+                    XXTHttpRequestUtils.objectToMap(userLoginVo));
             String responseBody = response.body().string();
-            System.out.println(phone + " 登录Response: " + responseBody);
+
+            log.info(phone + " 登录Response: " + responseBody);
+
             JSONObject jsonObject = JSONObject.parseObject(responseBody);
             if(jsonObject.getString("status").equals("true")) {
                 // 登录请求成功
                 List<String> headers = response.headers("set-Cookie");
                 // 空置判断
-
-                JSONObject jsonObject1 = HeadersUtils.getJsonObject(headers);
-
+                JSONObject jsonObject1 = XXTHttpRequestUtils.getJsonObject(headers);
                 // 保存数据到本地
-                HeadersUtils.storeUser(phone, jsonObject1);
-
+                XXTHttpRequestUtils.storeUser(phone, jsonObject1);
                 String userInfo = getUserInfo(jsonObject1);
                 // 保存用户名
-                HeadersUtils.storeUserName(userInfo, phone);
+                XXTHttpRequestUtils.storeUserName(userInfo, phone);
             }else {
                 // 登录失败
-                return false;
+                throw new XXTUserException("登录失败，请重新登录（多次登录失败请联系开发者）");
             }
         } catch (IOException e) {
             e.printStackTrace();
-            return false;
+            throw new XXTUserException("登录失败，请重新登录（多次登录失败请联系开发者）");
+        } finally {
+            if (response != null) {
+                response.close();
+            }
         }
+
         return true;
     }
 
     /**
-     * 设置请求头，返回登录请求头
-     * @return
+     * 设置请求头
+     * @return 登录请求头
      */
     public Map<String, String> customRequestHeader() {
-        Map<String, String> headers = HeadersUtils.getHeaders();
+        Map<String, String> headers = XXTHttpRequestUtils.getHeaders();
         Map<String, String> copyMap = new HashMap<>();
         copyMap.putAll(headers);
 
         copyMap.put("Accept", "application/json, text/javascript, */*; q=0.01");
         copyMap.put("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8");
-        copyMap.put("Origin", "https://passport2.chaoxing.com"); // TODO: 链接
+        // TODO: 链接
+        copyMap.put("Origin", "https://passport2.chaoxing.com");
         copyMap.put("Referer", "https://passport2.chaoxing.com/login?refer=https%3A%2F%2Fmooc2-ans.chaoxing.com%2Fmooc2-ans%2Fvisit%2Finteraction&fid=0&newversion=true&_blank=0");
         copyMap.put("Sec-Fetch-Dest", "empty");
         copyMap.put("Sec-Fetch-Mode", "cors");
@@ -133,14 +140,14 @@ public class DefaultXXTUserServiceImpl implements XXTUserService {
 
 
         try {
-            Response response = HeadersUtils.requestToXXT(url, "POST", headerMap, paramMap);
+            Response response = XXTHttpRequestUtils.requestToXXT(url, "POST", headerMap, paramMap);
             ResponseBody responseBody = response.body();
             String responseData = null;
             if (responseBody != null) {
-                responseData = HeadersUtils.decompress(responseBody.bytes());
+                responseData = XXTHttpRequestUtils.decompress(responseBody.bytes());
             }
 
-            return HeadersUtils.getCourseVos(responseData);
+            return XXTHttpRequestUtils.getCourseVos(responseData);
 
         } catch (IOException e) {
             e.printStackTrace();
@@ -197,9 +204,9 @@ public class DefaultXXTUserServiceImpl implements XXTUserService {
         headerMap.put("Sec-Fetch-Mode", "cors");
         headerMap.put("Sec-Fetch-Site", "same-origin");
         headerMap.put("X-Requested-With", "XMLHttpRequest");
-        headerMap.put("Cookie", HeadersUtils.jsonToHeader(cookie));
+        headerMap.put("Cookie", XXTHttpRequestUtils.jsonToHeader(cookie));
 
-        Response response = HeadersUtils.requestToXXT(url, "GET", headerMap);
+        Response response = XXTHttpRequestUtils.requestToXXT(url, "GET", headerMap);
 
         try {
 //            System.out.println("查询结果" + string);
@@ -270,31 +277,36 @@ public class DefaultXXTUserServiceImpl implements XXTUserService {
     /**
      * 获取用户的名字
      * @param cookie
-     * @return
+     * @return 用户名
      */
     public String getUserInfo(JSONObject cookie) {
-        // get
+        // get todo:魔术值
         String url = "https://passport2.chaoxing.com/mooc/accountManage";
         HashMap<String, String> headerMap = new HashMap<>();
-        headerMap.put("Cookie", HeadersUtils.jsonToHeader(cookie));
+        headerMap.put("Cookie", XXTHttpRequestUtils.jsonToHeader(cookie));
 
-        Response response = HeadersUtils.requestToXXT(url, "GET", headerMap);
+        Response response = null;
 
 
         try {
+            response = XXTHttpRequestUtils.requestToXXT(url, "GET", headerMap);
             String data = response.body().string();
 
             // 获取用户名字
             int endOfMessageName = data.indexOf("messageName") + 20;
             String name = data.substring(endOfMessageName, data.indexOf("\"", endOfMessageName));
-
-            System.out.println("===================================");
-            System.out.println("用户名字：" + name);
-            System.out.println("===================================");
+            log.info("===================================");
+            log.info("用户名字：" + name);
+            log.info("===================================");
 
             return name;
         } catch (IOException e) {
-            throw new RuntimeException(e);
+            e.printStackTrace();
+            throw new XXTUserException("登录成功，但是获取用户名失败，建议重新登录");
+        } finally {
+            if (response != null) {
+                response.close();
+            }
         }
 
     }
@@ -311,11 +323,12 @@ public class DefaultXXTUserServiceImpl implements XXTUserService {
                 "&activePrimaryId=" + activity.getString("activeId") + "&general=1&sys=1&ls=1&appType=15&&tid=&uid=" +
                 cookie.getString("_uid") + "&ut=s";
         HashMap<String, String> headerMap = new HashMap<>();
-        headerMap.put("Cookie", HeadersUtils.jsonToHeader(cookie));
+        headerMap.put("Cookie", XXTHttpRequestUtils.jsonToHeader(cookie));
 
         // 第一次预先请求
-        HeadersUtils.requestToXXT(url, "GET", headerMap);
-        System.out.println("预先请求完成1");
+        XXTHttpRequestUtils.requestToXXT(url, "GET", headerMap);
+//        System.out.println("预先请求完成1");
+        log.info("完成签到预先请求1");
 
         // 第二次
         analysisResult(activity, cookie);
@@ -326,13 +339,11 @@ public class DefaultXXTUserServiceImpl implements XXTUserService {
         String url = "https://mobilelearn.chaoxing.com/pptSign/analysis?vs=1&DB_STRATEGY=RANDOM&aid=" + activity.getString("activeId");
 
         HashMap<String, String> headerMap = new HashMap<>();
-        headerMap.put("Cookie", HeadersUtils.jsonToHeader(cookie));
+        headerMap.put("Cookie", XXTHttpRequestUtils.jsonToHeader(cookie));
 
         // 第二次预先请求
-        Response response = HeadersUtils.requestToXXT(url, "GET", headerMap);
-        System.out.println("预先请求完成2");
-
-        try {
+        try (Response response = XXTHttpRequestUtils.requestToXXT(url, "GET", headerMap)) {
+            log.info("完成签到预先请求2");
             String code = response.body().string();
 //            JSONObject jsonData = JSONObject.parseObject(string);
 //
@@ -359,17 +370,16 @@ public class DefaultXXTUserServiceImpl implements XXTUserService {
         String url = "https://mobilelearn.chaoxing.com/pptSign/analysis2?DB_STRATEGY=RANDOM&code=" + code;
 
         HashMap<String, String> headerMap = new HashMap<>();
-        headerMap.put("Cookie", HeadersUtils.jsonToHeader(cookie));
+        headerMap.put("Cookie", XXTHttpRequestUtils.jsonToHeader(cookie));
 
         // 第二次预先请求
-        Response response = HeadersUtils.requestToXXT(url, "GET", headerMap);
-        System.out.println("预先请求完成3");
-
-        try {
+        try (Response response = XXTHttpRequestUtils.requestToXXT(url, "GET", headerMap)) {
+            log.info("完成签到预先请求3");
             String string = response.body().string();
-            System.out.println("预先请求结果：" + string);
+            log.info("预先请求结果: " + string);
         } catch (IOException e) {
-            throw new RuntimeException(e);
+            e.printStackTrace();
+            throw new XXTUserException("预请求失败");
         }
 
         // Sleep for 500ms
@@ -395,9 +405,9 @@ public class DefaultXXTUserServiceImpl implements XXTUserService {
         }
 
         HashMap<String, String> headerMap = new HashMap<>();
-        headerMap.put("Cookie", HeadersUtils.jsonToHeader(cookie));
+        headerMap.put("Cookie", XXTHttpRequestUtils.jsonToHeader(cookie));
 
-        Response response = HeadersUtils.requestToXXT(url, "GET", headerMap);
+        Response response = XXTHttpRequestUtils.requestToXXT(url, "GET", headerMap);
 
 
         try {
@@ -450,9 +460,12 @@ public class DefaultXXTUserServiceImpl implements XXTUserService {
             } else if (location.equals("GDMUH")) {
                 longitude = randomCenterValue(LocationSignEnum.GDMU_H.getLongitude());
                 latitude = randomCenterValue(LocationSignEnum.GDMU_H.getLatitude());
-            } else if (location.equals("S")) {
+            } else if (location.equals("GDMUS")) {
                 longitude = randomCenterValue(LocationSignEnum.GDMU_S.getLongitude());
                 latitude = randomCenterValue(LocationSignEnum.GDMU_S.getLatitude());
+            } else if (location.equals("GDMUK")) {
+                longitude = randomCenterValue(LocationSignEnum.GDMU_K.getLongitude());
+                latitude = randomCenterValue(LocationSignEnum.GDMU_K.getLatitude());
             }
         }
 
@@ -461,8 +474,8 @@ public class DefaultXXTUserServiceImpl implements XXTUserService {
                 "&longitude=" + longitude + "&fid=" + cookie.getString("fid") + "&appType=15&ifTiJiao=1&validate=";
 
         HashMap<String, String> headerMap = new HashMap<>();
-        headerMap.put("Cookie", HeadersUtils.jsonToHeader(cookie));
-        Response response = HeadersUtils.requestToXXT(url, "GET", headerMap);
+        headerMap.put("Cookie", XXTHttpRequestUtils.jsonToHeader(cookie));
+        Response response = XXTHttpRequestUtils.requestToXXT(url, "GET", headerMap);
 
         try {
             String string = response.body().string();
@@ -516,22 +529,123 @@ public class DefaultXXTUserServiceImpl implements XXTUserService {
          * 3. 加入到文件中
          */
         if (StringUtils.isEmpty(phone) && StringUtils.isEmpty(mark)) {
-            return false;
+            throw new XXTUserException("电话号和组标识不能为空");
         }
         // 1. 先检查是否有这个组（有没有这个文件）// 2. 检查有没有这个用户
-        if (!HeadersUtils.hasJsonFile(mark) || !HeadersUtils.hasUser(phone)) {
-            return false;
+        if (!XXTHttpRequestUtils.hasJsonFile(mark) || !XXTHttpRequestUtils.hasUser(phone)) {
+            throw new XXTUserException("用户未登录或者不存在组");
         }
         // 3. 加入到文件中
-        if (HeadersUtils.storeUserJoinGroup(mark, phone)){
+        JSONObject user = xxtUserMapper.getUserByPhone(phone);
+        int insertUserToGroup = xxtUserMapper.insertUserToGroup(user, mark);
+        if (insertUserToGroup == 1) {
             return true;
         }
 
         return false;
     }
 
+
+    @Override
+    public List<XXTUserVO> getUserListByMark(String mark) {
+        if (!XXTHttpRequestUtils.hasJsonFile(mark)) {
+            throw new XXTUserException("不存在组");
+        }
+        // 获取组内用户名字和联系方式等
+        List<XXTUserVO> xxtUserVOS = new ArrayList<>();
+        JSONArray userListByMark = xxtUserMapper.getUserListByMark(mark);
+
+        // 遍历 JSONArray 中的每个 JSON 对象，并将其转换为 XXTUserVO 对象
+        for (int i = 0; i < userListByMark.size(); i++) {
+            JSONObject jsonObject = userListByMark.getJSONObject(i);
+            XXTUserVO xxtUserVO = new XXTUserVO();
+            // todo: 魔术
+            xxtUserVO.setName(jsonObject.getString("U_SName"));
+            xxtUserVO.setPhone(jsonObject.getString("phone"));
+            xxtUserVO.setLoginTime(jsonObject.getString("Login_Sign_System_Time"));
+            xxtUserVO.setAgainLoginTime(jsonObject.getString("Login_Sign_System_Time"));
+            xxtUserVOS.add(xxtUserVO);
+        }
+
+        return xxtUserVOS;
+    }
+
+    @Override
+    public void addGroup(String mark, String au) {
+        // todo: 魔术
+        String AU = "cheng_admin";
+        if (!au.equals(AU)) {
+            throw new XXTUserException("你没有创建权限");
+        }
+
+        String filePath = mark + ".json";
+
+        // 创建一个 File 对象
+        File file = new File(filePath);
+
+        // 检查文件是否存在
+        if (file.exists()) {
+            throw new XXTUserException("此组已经创建");
+        } else {
+            try {
+                // 尝试创建空文件
+                boolean created = file.createNewFile();
+
+//                if (created) {
+//                    System.out.println("Empty file created successfully: " + filePath);
+//                } else {
+//                    System.out.println("File could not be created.");
+//                }
+            } catch (IOException e) {
+//                System.out.println("An error occurred while creating the file.");
+                e.printStackTrace();
+                throw new XXTUserException("创建组错误");
+            }
+        }
+    }
+
+    @Override
+    public boolean delUser(String mark, String phone, String au) {
+        // todo: 魔术
+        String AU = "admin_del";
+        if (!au.equals(AU)) {
+            throw new XXTUserException("你没有移除权限");
+        }
+
+        String filePath = mark + ".json";
+
+        if (!XXTHttpRequestUtils.hasJsonFile(mark)) {
+            throw new XXTUserException("不存在组");
+        }
+        if (!XXTHttpRequestUtils.hasUser(phone)) {
+            throw new XXTUserException("不存用户");
+        }
+
+        JSONArray userListByMark = xxtUserMapper.getUserListByMark(mark);
+
+        if (!ObjectUtil.isEmpty(userListByMark)) {
+            for (int i = 0; i < userListByMark.size(); i++) {
+                JSONObject obj = userListByMark.getJSONObject(i);
+                if (obj.getString("phone").equals(phone)) {
+                    userListByMark.remove(i);
+                    break;
+                }
+            }
+        }
+
+        // 保存
+        try (FileWriter fileWriter = new FileWriter(filePath)) {
+            fileWriter.write(userListByMark.toJSONString());
+
+            return true;
+        } catch (IOException e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+
     public static void main(String[] args) {
-        JSONObject user = HeadersUtils.getUser("15992601106");
+        JSONObject user = XXTHttpRequestUtils.getUser("15992601106");
         DefaultXXTUserServiceImpl defaultXXTUserService = new DefaultXXTUserServiceImpl();
         List<CourseVo> courses = defaultXXTUserService.getCourses(user.getString("_uid"), user.getString("_d"), user.getString("vc3"));
 
@@ -559,6 +673,8 @@ public class DefaultXXTUserServiceImpl implements XXTUserService {
 
 
 //        DefaultXXTUserServiceImpl.randomValue(113.868562, 113.869482);
+
+
     }
 
 }
